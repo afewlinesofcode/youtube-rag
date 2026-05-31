@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app import db_infra
+from app import db
 from app.errors import register_exception_handlers
 from app.logger import bind_request_id, configure_logging, get_logger, reset_request_id
 from app.routers import chat_router, videos_router
@@ -41,14 +41,13 @@ async def request_context_middleware(request: Request, call_next):
 def startup() -> None:
     configure_logging(get_settings().log_level)
     logger.info("Initializing application")
-    db_infra.init_pool()
-    db_infra.init_db()
+    db.init_pool()
 
 
 @app.on_event("shutdown")
 def shutdown() -> None:
     logger.info("Shutting down application")
-    db_infra.close_pool()
+    db.close_pool()
 
 
 @app.get("/")

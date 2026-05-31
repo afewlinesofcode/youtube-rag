@@ -1,4 +1,4 @@
-from app.db_infra import get_conn
+from app.db import get_conn
 
 
 def list_messages(video_id: str) -> list[dict]:

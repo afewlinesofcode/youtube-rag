@@ -1,6 +1,6 @@
 import uuid
 
-from app.db_infra import get_conn
+from app.db import get_conn
 
 
 ACTIVE_JOB_MAX_AGE_MINUTES = 30

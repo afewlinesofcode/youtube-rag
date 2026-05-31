@@ -19,6 +19,22 @@ services:
     image: redis:7-alpine
     command: redis-server --save '' --appendonly no
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://youtube:youtube@postgres:5432/youtube_rag
+    command: alembic upgrade head
+    volumes:
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build:
       context: .
@@ -36,8 +52,8 @@ services:
     volumes:
       - ./:/app
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
 
@@ -57,8 +73,8 @@ services:
     volumes:
       - ./:/app
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
 

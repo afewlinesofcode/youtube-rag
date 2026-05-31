@@ -4,16 +4,16 @@ A single-page FastAPI app that ingests a YouTube transcript, chunks it with Lang
 
 ## Setup
 
-1. Start PostgreSQL:
-
-```bash
-docker compose up -d
-```
-
-2. Create and fill `.env`:
+1. Create and fill `.env`:
 
 ```bash
 cp .env.example .env
+```
+
+2. Start local infrastructure:
+
+```bash
+docker compose up -d postgres redis
 ```
 
 3. Install backend dependencies:
@@ -34,10 +34,17 @@ npm install
 5. Run the backend API:
 
 ```bash
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-6. Run the frontend app in a second terminal:
+6. Run the Celery worker in a second terminal:
+
+```bash
+celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+```
+
+7. Run the frontend app in a third terminal:
 
 ```bash
 cd frontend
@@ -62,6 +69,7 @@ This starts:
 - Backend API: `http://localhost:8000`
 - PostgreSQL with pgvector: internal compose service (`postgres:5432`)
 - Redis queue broker: internal compose service (`redis:6379`)
+- Alembic migration job that applies schema changes before app services start
 - Celery worker for ingestion jobs
 
 The compose setup bind-mounts your local source directories into containers, so editing code locally is reflected immediately:
@@ -97,6 +105,7 @@ Example Docker setup:
 `docker-compose.yml` already mounts `./.cookies` into `/app/.cookies` for backend and worker.
 
 - Video processing is asynchronous: `POST /api/videos/process` queues a job and `GET /api/videos/process/{job_id}` reports status.
+- Database schema is managed by Alembic migrations. Run `alembic upgrade head` before starting the backend outside Docker.
 - `videos` stores the generated title/topic and document id.
 - `chat_messages` stores the conversation history for each processed video.
 - `process_jobs` stores asynchronous ingestion job state.

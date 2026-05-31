@@ -1,9 +1,11 @@
 from pathlib import Path
-from app import logger
+from app.logger import get_logger
 from app.config import get_settings
 import yt_dlp
 from langchain_core.documents import Document
 from faster_whisper import WhisperModel
+
+logger = get_logger(__name__)
 
 def load_docs(youtube_url: str) -> list[Document]:
     settings = get_settings()

@@ -1,6 +1,6 @@
 from celery import Celery
 
-from app import db_infra
+from app import db
 from app.config import get_settings
 from app.logger import configure_logging, get_logger
 from app.services.process_job_service import process_video_job as run_process_video_job
@@ -20,8 +20,7 @@ celery_app = Celery(
 @celery_app.task(name="app.tasks.process_video_job")
 def process_video_job(job_id: str) -> None:
     logger.info("Starting video process job_id=%s", job_id)
-    db_infra.init_pool()
-    db_infra.init_db()
+    db.init_pool()
 
     try:
         run_process_video_job(job_id)

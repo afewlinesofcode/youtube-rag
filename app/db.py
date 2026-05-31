@@ -1,35 +1,40 @@
-"""Compatibility wrappers over db infrastructure and repository modules.
+from collections.abc import Iterator
+from contextlib import contextmanager
 
-Prefer importing from app.db_infra and app.repositories.* in new code.
-"""
+from psycopg import Connection
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
-from app.db_infra import close_pool, get_conn, init_db, init_pool
-from app.repositories.messages_repository import add_message, list_messages
-from app.repositories.process_job_repository import (
-    create_process_job,
-    get_active_process_job,
-    get_process_job,
-    mark_process_job_failed,
-    mark_process_job_running,
-    mark_process_job_succeeded,
-)
-from app.repositories.video_repository import create_video, get_video, list_videos
+from app.config import get_settings
 
 
-__all__ = [
-    "init_pool",
-    "close_pool",
-    "get_conn",
-    "init_db",
-    "list_videos",
-    "get_video",
-    "create_video",
-    "list_messages",
-    "add_message",
-    "create_process_job",
-    "get_active_process_job",
-    "get_process_job",
-    "mark_process_job_running",
-    "mark_process_job_succeeded",
-    "mark_process_job_failed",
-]
+pool: ConnectionPool | None = None
+
+
+def init_pool() -> None:
+    global pool
+    if pool is None:
+        settings = get_settings()
+        pool = ConnectionPool(
+            conninfo=settings.psycopg_connection_url,
+            kwargs={"row_factory": dict_row},
+            min_size=1,
+            max_size=8,
+            open=True,
+        )
+
+
+def close_pool() -> None:
+    global pool
+    if pool is not None:
+        pool.close()
+        pool = None
+
+
+@contextmanager
+def get_conn() -> Iterator[Connection]:
+    if pool is None:
+        init_pool()
+    assert pool is not None
+    with pool.connection() as conn:
+        yield conn
