@@ -1,5 +1,7 @@
 # YouTube RAG Chat
 
+[![CI](https://github.com/afewlinesofcode/youtube-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/afewlinesofcode/youtube-rag/actions/workflows/ci.yml)
+
 A production-shaped Python LLM/RAG application around a real user workflow.
 
 The app accepts a YouTube URL, extracts or transcribes the video content, chunks the transcript, stores OpenAI embeddings in PostgreSQL with pgvector, and opens a chat scoped to that video. Previously processed videos are saved in a library so the user can switch between video-specific chat contexts.
