@@ -1,115 +1,253 @@
-# YouTube RAG
+# YouTube RAG Chat
 
-A single-page FastAPI app that ingests a YouTube transcript, chunks it with LangChain, stores OpenAI embeddings in PostgreSQL with pgvector, and opens a chat scoped to that video.
+A production-shaped Python LLM/RAG application around a real user workflow.
 
-## Setup
+The app accepts a YouTube URL, extracts or transcribes the video content, chunks the transcript, stores OpenAI embeddings in PostgreSQL with pgvector, and opens a chat scoped to that video. Previously processed videos are saved in a library so the user can switch between video-specific chat contexts.
 
-1. Create and fill `.env`:
+The Python application integrates LLMs, retrieval, background jobs, persistence, and a usable frontend and includes:
+
+- FastAPI backend with service, repository, gateway, router, and schema boundaries.
+- LangChain-based ingestion and RAG orchestration.
+- OpenAI chat and embedding model integration.
+- PostgreSQL persistence with pgvector-backed semantic search.
+- Alembic migrations.
+- Celery and Redis for long-running video processing jobs.
+- Idempotent ingestion keyed by YouTube video ID.
+- Cleanup of vector records when metadata persistence fails.
+- Retry-aware job lifecycle with stale-job recovery.
+- React/Vite single-page UI with a video library and streaming chat.
+- Focused unit tests for high-risk behavior without requiring OpenAI, YouTube, or PostgreSQL.
+
+## User Flow
+
+1. The user enters a YouTube URL.
+2. The backend creates a processing job.
+3. A Celery worker loads the transcript, or falls back to audio transcription when enabled.
+4. The transcript is summarized into a title/topic.
+5. Transcript chunks are embedded and stored in pgvector.
+6. The processed video appears in the left-side library.
+7. The user chats with the video context on the right.
+8. Selecting another saved video switches the chat to that video's stored history and retrieval scope.
+
+## Architecture
+
+```text
+React/Vite UI
+    |
+    | HTTP + SSE
+    v
+FastAPI API
+    |
+    | enqueue job / poll status
+    v
+Celery Worker + Redis
+    |
+    | transcript/audio loading, chunking, summarization, embeddings
+    v
+PostgreSQL + pgvector
+```
+
+Important backend boundaries:
+
+- `app/routers`: FastAPI API endpoints.
+- `app/services`: application workflows and business rules.
+- `app/repositories`: PostgreSQL access.
+- `app/gateways`: external systems such as OpenAI, LangChain, pgvector, and YouTube.
+- `migrations`: Alembic schema changes.
+- `tests`: focused unit tests for ingestion, job lifecycle, chat guards, and RAG contracts.
+
+## Tech Stack
+
+- Python 3.11
+- FastAPI
+- Celery + Redis
+- PostgreSQL + pgvector
+- Alembic
+- LangChain
+- OpenAI chat and embeddings
+- YouTube transcript API, yt-dlp, faster-whisper
+- React 19, Vite, TypeScript, Tailwind CSS
+- Docker Compose
+
+## Environment
+
+Create `.env` from the example:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Start local infrastructure:
+Required value to fill:
 
-```bash
-docker compose up -d postgres redis
+```env
+OPENAI_API_KEY=sk-your-real-key
 ```
 
-3. Install backend dependencies:
+Usually safe to keep as-is for Docker:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```env
+OPENAI_CHAT_MODEL=gpt-5.4-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+WHISPER_MODEL=small
+DATABASE_URL=postgresql://youtube:youtube@localhost:5432/youtube_rag
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+LOG_LEVEL=INFO
+ENABLE_AUDIO_FALLBACK=true
+AUDIO_DOWNLOAD_DIR=.cache/audio
+CHUNK_SIZE=1200
+CHUNK_OVERLAP=200
 ```
 
-4. Install frontend dependencies:
+Notes:
 
-```bash
-cd frontend
-npm install
-```
+- `OPENAI_API_KEY` is required for summarization, embeddings, and chat answers.
+- `OPENAI_CHAT_MODEL` controls the chat/summarization model.
+- `OPENAI_EMBEDDING_MODEL` controls the embedding model used by pgvector.
+- `ENABLE_AUDIO_FALLBACK=true` lets the worker download audio and transcribe it when no transcript is available.
+- `WHISPER_MODEL` is the local faster-whisper model used for fallback transcription.
+- Docker Compose overrides database and Redis URLs inside containers so services can reach `postgres` and `redis`.
 
-5. Run the backend API:
+## Run With Docker
 
-```bash
-alembic upgrade head
-uvicorn app.main:app --reload
-```
+Prerequisites:
 
-6. Run the Celery worker in a second terminal:
+- Docker Desktop or Docker Engine with Compose.
+- An OpenAI API key.
 
-```bash
-celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
-```
-
-7. Run the frontend app in a third terminal:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open the frontend at `http://localhost:5173`.
-
-For a production frontend build, run `cd frontend && npm run build`. If the frontend is hosted on a different origin than FastAPI, set `VITE_API_BASE_URL` to the backend base URL.
-
-## Docker Development
-
-Run the full development stack (PostgreSQL, backend, and frontend) with one command:
+Start the full stack:
 
 ```bash
 docker compose up --build
 ```
 
-This starts:
+Open:
 
-- Frontend (Vite dev server): `http://localhost:5173`
+```text
+http://localhost:5173
+```
+
+Services:
+
+- Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8000`
-- PostgreSQL with pgvector: internal compose service (`postgres:5432`)
-- Redis queue broker: internal compose service (`redis:6379`)
-- Alembic migration job that applies schema changes before app services start
-- Celery worker for ingestion jobs
+- PostgreSQL: `localhost:5432`
+- Redis: internal Compose service
+- Alembic migration job: runs before backend and worker start
+- Celery worker: processes video ingestion jobs
 
-The compose setup bind-mounts your local source directories into containers, so editing code locally is reflected immediately:
-
-- Frontend runs `npm run dev` with HMR.
-- Backend runs `uvicorn app.main:app --reload`.
-- Worker runs Celery to process long-running video ingestion jobs.
-
-When running through Docker, compose overrides `DATABASE_URL` for the backend to use the `postgres` service hostname.
-
-To stop the stack:
+Stop the stack:
 
 ```bash
 docker compose down
 ```
 
-## Notes
+Reset local database state:
 
-- The backend first tries `YoutubeLoader` transcript tracks, then falls back to audio transcription for videos without text tracks.
-- Transcription mode is controlled by `TRANSCRIPTION_MODE` (`openai` or `local`).
-- If yt-dlp reports "Sign in to confirm you're not a bot", export YouTube cookies and set `YT_DLP_COOKIES_FILE`.
-- In Docker, mount the cookies file into backend and worker containers and point `YT_DLP_COOKIES_FILE` to that in-container path.
-- Read-only cookie mounts are supported: the app copies the cookie file to a writable temp location before calling yt-dlp.
-- Cookie file can be Netscape cookies.txt, or a JSON cookie export (the app will convert JSON to Netscape format automatically).
-- If you see "does not look like a Netscape format cookies file", verify `.cookies/youtube.txt` is not empty.
+```bash
+docker compose down -v
+```
 
-Example Docker setup:
+## Demo Script
 
-1. Place exported cookies at `.cookies/youtube.txt`.
-2. Set `YT_DLP_COOKIES_FILE=/app/.cookies/youtube.txt` in `.env`.
-3. Restart services: `docker compose up -d --build`.
+1. Start the stack with `docker compose up --build`.
+2. Open `http://localhost:5173`.
+3. Paste a YouTube URL.
+4. Wait for the job status to move through queued/running/succeeded.
+5. Ask questions about the video.
+6. Process another video.
+7. Use the left-side library to switch between saved videos and continue each chat in its own context.
+8. Submit the same YouTube URL again to show idempotent processing: it reuses the existing video context instead of duplicating data.
 
-`docker-compose.yml` already mounts `./.cookies` into `/app/.cookies` for backend and worker.
+## Reliability Features
 
-- Video processing is asynchronous: `POST /api/videos/process` queues a job and `GET /api/videos/process/{job_id}` reports status.
-- Processing jobs track attempts and retry transient failures up to 3 total attempts with exponential backoff.
-- Queued or running jobs older than 30 minutes are marked failed as stale when the API starts or checks active work.
-- Database schema is managed by Alembic migrations. Run `alembic upgrade head` before starting the backend outside Docker.
-- `videos` stores the generated title/topic and document id.
-- `chat_messages` stores the conversation history for each processed video.
-- `process_jobs` stores asynchronous ingestion job state.
-- Transcript chunks and embeddings are stored by `langchain-postgres` in pgvector tables under the `youtube_transcripts` collection.
-- The new frontend lives under `frontend/` and talks to the FastAPI API under `/api`.
+- Video ingestion is asynchronous and does not block the API request.
+- Processing jobs retry transient failures up to 3 total attempts with exponential backoff.
+- Queued/running jobs older than 30 minutes are marked failed as stale.
+- Duplicate video submissions are scoped by YouTube video ID.
+- Vector chunks written during a failed metadata insert are deleted to avoid orphan embeddings.
+- Alembic owns schema changes.
+
+## Testing
+
+Run backend tests:
+
+```bash
+python -m unittest discover -s tests
+```
+
+Run Python syntax checks:
+
+```bash
+python -m compileall app migrations tests
+```
+
+Run frontend type checks:
+
+```bash
+cd frontend
+npm run check
+```
+
+Current tests are intentionally focused on high-risk behavior:
+
+- YouTube URL parsing.
+- Ingestion idempotency and vector cleanup.
+- Job retry/failure lifecycle.
+- Chat service guard behavior.
+- RAG retrieval scoping and transcript/audio fallback contracts.
+
+## Local Development Without Full Docker
+
+For backend/frontend development outside Compose, keep PostgreSQL and Redis running:
+
+```bash
+docker compose up -d postgres redis
+```
+
+Install backend dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+```
+
+Run the API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Run the worker in another terminal:
+
+```bash
+celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+```
+
+Run the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## API Overview
+
+- `GET /api/videos`: list processed videos.
+- `POST /api/videos/process`: queue or reuse processing for a YouTube URL.
+- `GET /api/videos/process/active`: return the latest active processing job.
+- `GET /api/videos/process/{job_id}`: poll processing status.
+- `GET /api/videos/{document_id}/messages`: load chat history for a video.
+- `POST /api/chat`: answer a question for a processed video.
+- `POST /api/chat/stream`: stream an answer with Server-Sent Events.
+
+## Current Limitations
+
+- The UI is optimized for a demo workflow, not multi-user production use.
+- RAG answers do not yet display citations or retrieved source snippets.
+- There is no authentication or tenant isolation.
+- CORS is permissive for local development.
+- Audio fallback depends on YouTube availability, yt-dlp behavior, ffmpeg, and local CPU transcription speed.
