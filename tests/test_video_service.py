@@ -32,6 +32,7 @@ class VideoServiceTest(unittest.TestCase):
             patch.object(video_service, "get_active_process_job_by_youtube_video_id", return_value=None),
             patch.object(video_service, "create_process_job", return_value=queued_job),
             patch.object(video_service.process_video_job, "delay") as delay,
+            patch.object(video_service, "logger"),
         ):
             self.assertEqual(video_service.create_video_process_job("https://youtu.be/youtube-id"), queued_job)
 

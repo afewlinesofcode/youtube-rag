@@ -32,6 +32,7 @@ class IngestionServiceTest(unittest.TestCase):
             patch.object(ingestion_service, "add_documents", side_effect=lambda _, ids: added_ids.extend(ids)),
             patch.object(ingestion_service, "delete_documents", side_effect=lambda ids: deleted_ids.extend(ids)),
             patch.object(ingestion_service, "create_video", side_effect=raise_duplicate),
+            patch.object(ingestion_service, "logger"),
         ):
             video = ingestion_service.ingest_youtube_video("https://youtu.be/youtube-id", "youtube-id")
 
