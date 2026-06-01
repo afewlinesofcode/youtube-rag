@@ -28,7 +28,7 @@ async def process_video(payload: ProcessVideoRequest) -> dict:
     except ValueError as exc:
         raise BadRequestError(str(exc), code="video_process_invalid_request") from exc
     except Exception as exc:
-        logger.exception("Could not process video", exc_info=exc)
+        logger.exception("Could not process video")
         raise InternalServerError("Could not process video", code="video_process_failed") from exc
 
 

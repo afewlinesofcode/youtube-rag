@@ -57,12 +57,12 @@ def process_video_job(self, job_id: str) -> None:
         if attempt_count >= max_attempts or isinstance(exc, ValueError):
             failure_reason = "permanent_error" if isinstance(exc, ValueError) else "transient_error"
             mark_process_job_failed(job_id, error, failure_reason=failure_reason)
-            logger.exception("Process job failed job_id=%s", job_id, exc_info=exc)
+            logger.exception("Process job failed job_id=%s", job_id)
             raise
 
         mark_process_job_retryable_failure(job_id, error)
         countdown = _retry_countdown(attempt_count)
-        
+
         logger.warning(
             "Retrying process job job_id=%s attempt=%s max_attempts=%s countdown=%s",
             job_id,
@@ -73,7 +73,7 @@ def process_video_job(self, job_id: str) -> None:
         raise self.retry(exc=exc, countdown=countdown)
 
     except BaseException as exc:
-        logger.exception("Process job failed job_id=%s", job_id, exc_info=exc)
+        logger.exception("Process job failed job_id=%s", job_id)
         raise
 
     logger.info("Process job succeeded job_id=%s", job_id)

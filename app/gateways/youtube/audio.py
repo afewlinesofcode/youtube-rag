@@ -25,8 +25,8 @@ def load_docs(youtube_url: str) -> list[Document]:
             str(audio_path),
             beam_size=5,
         )
-    except Exception as e:
-        logger.error(f"Failed to transcribe audio for {youtube_url}: {e}")
+    except Exception:
+        logger.exception("Failed to transcribe audio for %s", youtube_url)
         raise
     finally:
         if audio_path.exists():
@@ -48,28 +48,28 @@ def load_docs(youtube_url: str) -> list[Document]:
 
 def _download_audio(youtube_url: str) -> tuple[Path, str]:
     try:
-      settings = get_settings()
-      base_dir = Path(settings.audio_download_dir)
-      base_dir.mkdir(parents=True, exist_ok=True)
-      
-      ydl_opts = {
-          "format": "m4a/bestaudio/best",
-          "outtmpl": str(base_dir / "%(id)s.%(ext)s"),
-          "postprocessors": [
-              {
-                  "key": "FFmpegExtractAudio",
-                  "preferredcodec": "m4a",
-              }
-          ],
-          "quiet": True,
-          "no_warnings": True,
-      }
+        settings = get_settings()
+        base_dir = Path(settings.audio_download_dir)
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-      with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-          info = ydl.extract_info(youtube_url, download=True)
-      
-      video_id = str(info.get("id") or extract_youtube_video_id(youtube_url))
-      return base_dir / f"{video_id}.m4a", video_id
-    except Exception as e:
-        logger.error(f"Failed to download audio for {youtube_url}: {e}")
+        ydl_opts = {
+            "format": "m4a/bestaudio/best",
+            "outtmpl": str(base_dir / "%(id)s.%(ext)s"),
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "m4a",
+                }
+            ],
+            "quiet": True,
+            "no_warnings": True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(youtube_url, download=True)
+
+        video_id = str(info.get("id") or extract_youtube_video_id(youtube_url))
+        return base_dir / f"{video_id}.m4a", video_id
+    except Exception:
+        logger.exception("Failed to download audio for %s", youtube_url)
         raise

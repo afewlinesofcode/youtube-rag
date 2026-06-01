@@ -20,7 +20,7 @@ async def chat(payload: ChatRequest) -> dict:
     except NotFoundError:
         raise
     except Exception as exc:
-        logger.exception("Could not answer question", exc_info=exc)
+        logger.exception("Could not answer question")
         raise InternalServerError("Could not answer question", code="chat_answer_failed") from exc
     return {"answer": answer}
 
@@ -32,7 +32,7 @@ def chat_stream(payload: ChatRequest) -> StreamingResponse:
     except NotFoundError:
         raise
     except Exception as exc:
-        logger.exception("Could not start chat stream", exc_info=exc)
+        logger.exception("Could not start chat stream")
         raise InternalServerError("Could not answer question", code="chat_answer_failed") from exc
 
     def event_stream():
@@ -41,7 +41,7 @@ def chat_stream(payload: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as exc:
-            logger.exception("Chat stream failed", exc_info=exc)
+            logger.exception("Chat stream failed")
             yield f"data: {json.dumps({'type': 'error', 'detail': 'Could not answer question.'})}\n\n"
 
     return StreamingResponse(
