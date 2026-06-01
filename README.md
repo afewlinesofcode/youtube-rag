@@ -105,6 +105,8 @@ Example Docker setup:
 `docker-compose.yml` already mounts `./.cookies` into `/app/.cookies` for backend and worker.
 
 - Video processing is asynchronous: `POST /api/videos/process` queues a job and `GET /api/videos/process/{job_id}` reports status.
+- Processing jobs track attempts and retry transient failures up to 3 total attempts with exponential backoff.
+- Queued or running jobs older than 30 minutes are marked failed as stale when the API starts or checks active work.
 - Database schema is managed by Alembic migrations. Run `alembic upgrade head` before starting the backend outside Docker.
 - `videos` stores the generated title/topic and document id.
 - `chat_messages` stores the conversation history for each processed video.

@@ -24,12 +24,20 @@ export function useVideoProcessPolling({
         const currentJob = await getVideoProcess(jobId);
 
         if (currentJob.status === "queued") {
-          onInfoStatus("Job queued. Waiting for worker...");
+          if (currentJob.attempt_count > 0) {
+            onInfoStatus(
+              `Retry queued. Attempt ${currentJob.attempt_count + 1} of ${currentJob.max_attempts} will start soon...`,
+            );
+          } else {
+            onInfoStatus("Job queued. Waiting for worker...");
+          }
           continue;
         }
 
         if (currentJob.status === "running") {
-          onInfoStatus("Processing transcript and embeddings...");
+          onInfoStatus(
+            `Processing transcript and embeddings. Attempt ${currentJob.attempt_count} of ${currentJob.max_attempts}...`,
+          );
           continue;
         }
 

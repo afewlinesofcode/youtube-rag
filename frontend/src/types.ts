@@ -30,4 +30,10 @@ export interface ProcessJob {
   error: string | null;
   created_at: string;
   updated_at: string;
+  attempt_count: number;
+  max_attempts: number;
+  started_at: string | null;
+  finished_at: string | null;
+  last_error: string | null;
+  failure_reason: string | null;
 }

@@ -8,6 +8,7 @@ from app.config import get_settings
 from app import db
 from app.errors import register_exception_handlers
 from app.logger import bind_request_id, configure_logging, get_logger, reset_request_id
+from app.repositories.process_job_repository import mark_stale_process_jobs_failed
 from app.routers import chat_router, videos_router
 
 
@@ -42,6 +43,9 @@ def startup() -> None:
     configure_logging(get_settings().log_level)
     logger.info("Initializing application")
     db.init_pool()
+    stale_count = mark_stale_process_jobs_failed()
+    if stale_count:
+        logger.warning("Marked stale process jobs failed count=%s", stale_count)
 
 
 @app.on_event("shutdown")
