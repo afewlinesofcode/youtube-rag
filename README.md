@@ -4,6 +4,8 @@ A production-shaped Python LLM/RAG application around a real user workflow.
 
 The app accepts a YouTube URL, extracts or transcribes the video content, chunks the transcript, stores OpenAI embeddings in PostgreSQL with pgvector, and opens a chat scoped to that video. Previously processed videos are saved in a library so the user can switch between video-specific chat contexts.
 
+https://github.com/user-attachments/assets/382f8edb-8aa2-46ab-bfd1-4b6f826e1425
+
 The Python application integrates LLMs, retrieval, background jobs, persistence, and a usable frontend and includes:
 
 - FastAPI backend with service, repository, gateway, router, and schema boundaries.
