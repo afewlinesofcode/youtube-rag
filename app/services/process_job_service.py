@@ -5,6 +5,7 @@ from app.repositories.process_job_repository import (
     mark_process_job_running,
     mark_process_job_succeeded,
 )
+from app.gateways.youtube.url import extract_youtube_video_id
 from app.services.ingestion_service import ingest_youtube_video
 
 
@@ -19,7 +20,8 @@ def process_video_job(job_id: str) -> None:
 
     mark_process_job_running(job_id)
     try:
-        video = ingest_youtube_video(job["youtube_url"])
+        youtube_video_id = job.get("youtube_video_id") or extract_youtube_video_id(job["youtube_url"])
+        video = ingest_youtube_video(job["youtube_url"], youtube_video_id)
     except Exception as exc:
         mark_process_job_failed(job_id, str(exc))
         raise

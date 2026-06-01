@@ -1,6 +1,7 @@
 export interface Video {
   id: string;
   youtube_url: string;
+  youtube_video_id: string | null;
   title: string;
   topic: string;
   created_at: string;
@@ -23,6 +24,7 @@ export type UiMessage = ChatMessage & {
 export interface ProcessJob {
   id: string;
   youtube_url: string;
+  youtube_video_id: string | null;
   status: "queued" | "running" | "succeeded" | "failed";
   video_id: string | null;
   error: string | null;

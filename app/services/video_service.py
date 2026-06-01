@@ -1,11 +1,18 @@
 from app.errors import NotFoundError
+from app.gateways.youtube.url import extract_youtube_video_id
 from app.logger import get_logger
 from app.repositories.process_job_repository import (
+    create_succeeded_process_job,
     create_process_job,
     get_active_process_job,
+    get_active_process_job_by_youtube_video_id,
     get_process_job,
 )
-from app.repositories.video_repository import get_video, list_videos as list_videos_repo
+from app.repositories.video_repository import (
+    get_video,
+    get_video_by_youtube_video_id,
+    list_videos as list_videos_repo,
+)
 from app.repositories.messages_repository import list_messages
 from app.tasks import process_video_job
 
@@ -18,13 +25,17 @@ def list_videos() -> list[dict]:
 
 
 def create_video_process_job(youtube_url: str) -> dict:
-    active_job = get_active_process_job()
-    if active_job is not None:
-        raise ValueError(
-            "A video processing job is already running. Please wait for it to finish before starting a new one."
-        )
+    youtube_video_id = extract_youtube_video_id(youtube_url)
 
-    job = create_process_job(youtube_url)
+    existing_video = get_video_by_youtube_video_id(youtube_video_id)
+    if existing_video is not None:
+        return create_succeeded_process_job(youtube_url, youtube_video_id, existing_video["id"])
+
+    active_job = get_active_process_job_by_youtube_video_id(youtube_video_id)
+    if active_job is not None:
+        return active_job
+
+    job = create_process_job(youtube_url, youtube_video_id)
     process_video_job.delay(job["id"])
     logger.info("Queued video processing job_id=%s", job["id"])
     return job

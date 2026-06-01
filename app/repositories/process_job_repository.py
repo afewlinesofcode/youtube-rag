@@ -1,5 +1,7 @@
 import uuid
 
+from psycopg.errors import UniqueViolation
+
 from app.db import get_conn
 
 
@@ -10,7 +12,7 @@ def get_active_process_job(*, max_age_minutes: int = ACTIVE_JOB_MAX_AGE_MINUTES)
     with get_conn() as conn:
         return conn.execute(
             """
-            SELECT id::text, youtube_url, status, video_id::text, error, created_at, updated_at
+            SELECT id::text, youtube_url, youtube_video_id, status, video_id::text, error, created_at, updated_at
             FROM process_jobs
             WHERE status IN ('queued', 'running')
               AND COALESCE(updated_at, created_at) >= now() - make_interval(mins => %s)
@@ -21,16 +23,53 @@ def get_active_process_job(*, max_age_minutes: int = ACTIVE_JOB_MAX_AGE_MINUTES)
         ).fetchone()
 
 
-def create_process_job(youtube_url: str) -> dict:
+def get_active_process_job_by_youtube_video_id(youtube_video_id: str) -> dict | None:
+    with get_conn() as conn:
+        return conn.execute(
+            """
+            SELECT id::text, youtube_url, youtube_video_id, status, video_id::text, error, created_at, updated_at
+            FROM process_jobs
+            WHERE youtube_video_id = %s
+              AND status IN ('queued', 'running')
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            (youtube_video_id,),
+        ).fetchone()
+
+
+def create_process_job(youtube_url: str, youtube_video_id: str) -> dict:
+    job_id = str(uuid.uuid4())
+    with get_conn() as conn:
+        try:
+            row = conn.execute(
+                """
+                INSERT INTO process_jobs (id, youtube_url, youtube_video_id, status)
+                VALUES (%s, %s, %s, 'queued')
+                RETURNING id::text, youtube_url, youtube_video_id, status, video_id::text, error, created_at, updated_at
+                """,
+                (job_id, youtube_url, youtube_video_id),
+            ).fetchone()
+            conn.commit()
+        except UniqueViolation:
+            conn.rollback()
+            row = get_active_process_job_by_youtube_video_id(youtube_video_id)
+            assert row is not None
+            return row
+    assert row is not None
+    return row
+
+
+def create_succeeded_process_job(youtube_url: str, youtube_video_id: str, video_id: str) -> dict:
     job_id = str(uuid.uuid4())
     with get_conn() as conn:
         row = conn.execute(
             """
-            INSERT INTO process_jobs (id, youtube_url, status)
-            VALUES (%s, %s, 'queued')
-            RETURNING id::text, youtube_url, status, video_id::text, error, created_at, updated_at
+            INSERT INTO process_jobs (id, youtube_url, youtube_video_id, status, video_id)
+            VALUES (%s, %s, %s, 'succeeded', %s)
+            RETURNING id::text, youtube_url, youtube_video_id, status, video_id::text, error, created_at, updated_at
             """,
-            (job_id, youtube_url),
+            (job_id, youtube_url, youtube_video_id, video_id),
         ).fetchone()
         conn.commit()
     assert row is not None
@@ -41,7 +80,7 @@ def get_process_job(job_id: str) -> dict | None:
     with get_conn() as conn:
         return conn.execute(
             """
-            SELECT id::text, youtube_url, status, video_id::text, error, created_at, updated_at
+            SELECT id::text, youtube_url, youtube_video_id, status, video_id::text, error, created_at, updated_at
             FROM process_jobs
             WHERE id = %s
             """,

@@ -72,6 +72,11 @@ def add_documents(documents: list, ids: list) -> None:
     _vector_store().add_documents(documents, ids=ids)
 
 
+def delete_documents(ids: list[str]) -> None:
+    if ids:
+        _vector_store().delete(ids=ids)
+
+
 def retriever_for_id(id: str, k: int = 5) -> PGVector:
     return _vector_store().as_retriever(search_kwargs={"k": k, "filter": {"document_id": id}})
 

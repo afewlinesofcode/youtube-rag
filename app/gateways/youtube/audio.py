@@ -5,7 +5,10 @@ import yt_dlp
 from langchain_core.documents import Document
 from faster_whisper import WhisperModel
 
+from app.gateways.youtube.url import extract_youtube_video_id
+
 logger = get_logger(__name__)
+
 
 def load_docs(youtube_url: str) -> list[Document]:
     settings = get_settings()
@@ -42,6 +45,7 @@ def load_docs(youtube_url: str) -> list[Document]:
         )
     ]
 
+
 def _download_audio(youtube_url: str) -> tuple[Path, str]:
     try:
       settings = get_settings()
@@ -64,7 +68,7 @@ def _download_audio(youtube_url: str) -> tuple[Path, str]:
       with yt_dlp.YoutubeDL(ydl_opts) as ydl:
           info = ydl.extract_info(youtube_url, download=True)
       
-      video_id = info["id"]
+      video_id = str(info.get("id") or extract_youtube_video_id(youtube_url))
       return base_dir / f"{video_id}.m4a", video_id
     except Exception as e:
         logger.error(f"Failed to download audio for {youtube_url}: {e}")
